@@ -4,7 +4,7 @@
   .thumb
 
   .global Main
-
+@hello world
   @ Definitions are in support/definitions.s to keep blinky.s "clean"
   .include "definitions.s"
 
