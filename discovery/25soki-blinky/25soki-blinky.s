@@ -27,11 +27,14 @@ Main:
   @ by setting bits 27:26 of GPIOE_MODER to 01 (GPIO Port E Mode Register)
   @ (by BIClearing then ORRing)
   LDR     R4, =GPIOE_MODER
-  LDR     R5, [R4]                  @ Read ...
-  BIC     R5, #0xFC00F000  @ Modify ...
-  ORR     R5, #0x54005000  @ write 01 to bits 
-  STR     R5, [R4]                  @ Write 
-  LDR     R6, #(LD3_PIN)
+  LDR     R4, =GPIOE_MODER
+  LDR     R5, [R4]
+  LDR     R6, =0xFFFF0000        @ Clear MODER bits for pins 8–15
+  BIC     R5, R6
+  LDR     R6, =0x55550000        @ Set all pins 8–15 to output (0b01)
+  ORR     R5, R6
+  STR     R5, [R4]
+  MOV     R6, #(LD4_PIN)
 
   @ Loop forever
 .LwhBlink:
@@ -43,10 +46,22 @@ Main:
   .LResetReturn:
   LDR     R4, =GPIOE_ODR
   LDR     R5, [R4]                  @ Read ...
-  EOR     R5, #(0b1<<R6)         @ Modify ...
+  MOV     R12, #1
+  LSL     R12, R12, R6     @ R12 = 1 << R6
+  EOR     R5, R12         @ Modify ...
   STR     R5, [R4]                  @ Write
 
   @ wait for 1s ...
+  LDR     R0, =BLINK_PERIOD
+  BL      delay_ms
+
+  LDR     R4, =GPIOE_ODR
+  LDR     R5, [R4]                  @ Read ...
+  MOV     R12, #1
+  LSL     R12, R12, R6     @ R12 = 1 << R6
+  EOR     R5, R12         @ Modify ...
+  STR     R5, [R4]  
+
   LDR     R0, =BLINK_PERIOD
   BL      delay_ms
 
@@ -55,7 +70,7 @@ Main:
   B       .LwhBlink
   
   .LResetPin:
-  LDR     R6, #(LD3_PIN)
+  MOV     R6, #(LD4_PIN)
   B .LResetReturn
 
 End_Main:
