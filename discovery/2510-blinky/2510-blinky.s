@@ -4,7 +4,7 @@
   .thumb
 
   .global Main
-@hello world
+
   @ Definitions are in support/definitions.s to keep blinky.s "clean"
   .include "definitions.s"
 
@@ -16,17 +16,6 @@
 
   .section .text
 
-@Subroutine random number generator:
-@parameters: none
-@returns: random number of size 32 bits. 
-@This subroutine generates a random number by using the system tick counter.
-randomNumberGenerator:
-  PUSH    {R4-R5,LR}
-  LDR     R4, =SysTick_VAL
-  LDR     R5, [R4]
-  MOV     R0, R5
-  
-  POP     {R4-R5,PC}
 Main:
   PUSH    {R4-R5,LR}
 
