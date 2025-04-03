@@ -22,7 +22,7 @@
 @This subroutine generates a random number by using the system tick counter.
  RandomNumberGenerator:
   push    {R4,LR}
-  ldr     R4, =SysTick_VAL 
+  ldr     R4, =SYSTICK_VAL 
   ldr     r0, [R4] @r0 contains the system tick counter value. System tick is a 24 bit value. (16,777,216 is its max.)
   and r0, #0b111
   @return a random number from 0 - 7 in r0.
