@@ -20,13 +20,13 @@
 @parameters: none
 @returns: random number of size 32 bits to r0.
 @This subroutine generates a random number by using the system tick counter.
-randomNumberGenerator:
-  push    {R4-R5,LR}
+ RandomNumberGenerator:
+  push    {R4,LR}
   ldr     R4, =SysTick_VAL 
   ldr     r0, [R4] @r0 contains the system tick counter value. System tick is a 24 bit value. (16,777,216 is its max.)
   and r0, #0b111
   @return a random number from 0 - 7 in r0.
-  pop     {R4-R5,PC}
+  pop     {R4,PC}
 
 Main:
   PUSH    {R4-R5,LR}
