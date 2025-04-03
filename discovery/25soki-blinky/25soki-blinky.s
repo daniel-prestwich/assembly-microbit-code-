@@ -27,14 +27,16 @@ Main:
   @ by setting bits 27:26 of GPIOE_MODER to 01 (GPIO Port E Mode Register)
   @ (by BIClearing then ORRing)
   LDR     R4, =GPIOE_MODER
-  LDR     R4, =GPIOE_MODER
-  LDR     R5, [R4]
-  LDR     R6, =0xFFFF0000        @ Clear MODER bits for pins 8–15
-  BIC     R5, R6
-  LDR     R6, =0x55550000        @ Set all pins 8–15 to output (0b01)
-  ORR     R5, R6
-  STR     R5, [R4]
-  MOV     R6, #(LD4_PIN)
+  LDR     R5, [R4]                  @ Read ...
+  BIC     R5, #0xFC00F000  @ Modify ...
+  ORR     R5, #0x54005000  @ write 01 to bits 
+  STR     R5, [R4]                  @ Write 
+  LDR     R6, #8
+  MOV     R1, #0x1 
+  MOV R7, #1
+
+  BL randomNumberGenerator
+  MOV R8, R0 @R8 = random number
 
   @ Loop forever
 .LwhBlink:
@@ -43,12 +45,14 @@ Main:
   @ (by using EOR to invert bit 13, leaving other bits unchanged)
   CMP     R6, #15
   BGT     .LResetPin
+
+  CMP R7, R8 @r7= count, R8= random number
+  BGT .LEndLights
+
   .LResetReturn:
   LDR     R4, =GPIOE_ODR
   LDR     R5, [R4]                  @ Read ...
-  MOV     R12, #1
-  LSL     R12, R12, R6     @ R12 = 1 << R6
-  EOR     R5, R12         @ Modify ...
+  EOR     R5, R5, R1, LSL R6 
   STR     R5, [R4]                  @ Write
 
   @ wait for 1s ...
@@ -57,21 +61,23 @@ Main:
 
   LDR     R4, =GPIOE_ODR
   LDR     R5, [R4]                  @ Read ...
-  MOV     R12, #1
-  LSL     R12, R12, R6     @ R12 = 1 << R6
-  EOR     R5, R12         @ Modify ...
-  STR     R5, [R4]  
+  EOR     R5, R5, R1, LSL R6 
+  STR     R5, [R4]
 
+  @ wait for 1s ...
   LDR     R0, =BLINK_PERIOD
   BL      delay_ms
 
   @ ... and repeat
   ADD R6, R6, #1
+  ADD R7, R7, #1
   B       .LwhBlink
   
   .LResetPin:
-  MOV     R6, #(LD4_PIN)
+  LDR     R6, #(LD3_PIN)
   B .LResetReturn
+
+  .LEndLights
 
 End_Main:
   POP   {R4-R6,PC}
