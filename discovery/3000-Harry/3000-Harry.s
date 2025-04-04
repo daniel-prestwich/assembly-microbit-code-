@@ -1,19 +1,70 @@
-  .syntax unified
-  .cpu cortex-m4
-  .fpu softvfp
-  .thumb
-  
-  .global  Main
+.syntax unified
+.cpu cortex-m4
+.fpu softvfp
+.thumb
 
-  @ Definitions are in definitions.s to keep blinky.s "clean"
-  .include "definitions.s"
+.global Main
+.global EXTI0_IRQHandler
 
-  .equ    BLINK_PERIOD, 500
+.include "definitions.s"
 
-  .section .text
+.equ    BLINK_PERIOD, 500
+
+.section .text
 
 Main:
-  PUSH    {R4-R6,LR}
+
+
+  PUSH  {R4-R5,LR}
+
+  @ Enable SYSCFG clock (needed for EXTI configuration)
+  LDR   R4, =RCC_AHBENR
+  LDR   R5, [R4]
+  ORR   R5, R5, #(1<<0)   @ Enable SYSCFG clock (bit 0 of APB2ENR)
+  STR   R5, [R4]
+
+  @ Configure USER pushbutton (GPIO Port A Pin 0) to use EXTI0
+  LDR   R4, =SYSCFG_EXTIICR1
+  LDR   R5, [R4]
+  BIC   R5, R5, #0b1111   @ Clear bits 3:0 to select PA0
+  STR   R5, [R4]
+
+  @ Enable (unmask) interrupts on EXTI0
+  LDR   R4, =EXTI_IMR
+  LDR   R5, [R4]
+  ORR   R5, R5, #1        @ Set bit 0 for EXTI0
+  STR   R5, [R4]
+
+  @ Set falling edge detection on EXTI0
+  LDR   R4, =EXTI_FTSR
+  LDR   R5, [R4]
+  ORR   R5, R5, #1        @ Set bit 0 for EXTI0
+  STR   R5, [R4]
+
+  @ Enable NVIC interrupt for EXTI0 (IRQ 6)
+  LDR   R4, =NVIC_ISER
+  MOV   R5, #(1<<6)       @ Set bit 6 for EXTI0 IRQ
+  STR   R5, [R4]
+
+  LDR   R4, =SYSTICK_CSR            @ Stop SysTick timer
+  LDR   R5, =0                      @   by writing 0 to CSR
+  STR   R5, [R4]                    @   CSR is the Control and Status Register
+  
+  LDR   R4, =SYSTICK_LOAD           @ Set SysTick LOAD for 1ms delay
+  LDR   R5, =9999999999999999999                   @ Assuming a 8MHz clock
+  STR   R5, [R4]                    @ 
+
+  LDR   R4, =SYSTICK_CSR            @ Start SysTick timer by setting CSR to 0x5
+  LDR   R5, =0x5                    @   set CLKSOURCE (bit 2) to system clock (1)
+  STR   R5, [R4]                    @   set ENABLE (bit 0) to 1
+
+  @ Nothing else to do in Main
+  @ Idle loop forever
+Idle_Loop:
+  B     Idle_Loop
+  
+ButtonPressed:
+  AND   R11, 0b111
 
   @ Enable GPIO port E by enabling its clock
   LDR     R4, =RCC_AHBENR
@@ -36,8 +87,7 @@ Main:
   STR     R5, [R4]
   MOV     R6, #(LD4_PIN)
 
-  BL RandomNumberGenerator
-  MOV R8, #4 @R8 = random number
+  MOV     R8, R11 @R8 = random number
 
   @ Loop forever
 .LwhBlink:
@@ -88,17 +138,8 @@ Main:
 
   .LEndLights:
 
-End_Main:
   POP   {R4-R6,PC}
 
-
- RandomNumberGenerator:
-  push    {R4,LR}
-  ldr     R4, =SYSTICK_VAL 
-  ldr     r0, [R4] @r0 contains the system tick counter value. System tick is a 24 bit value. (16,777,216 is its max.)
-  and     r0, r0, #0b111
-  @return a random number from 0 - 7 in r0.
-  pop     {R4,PC}
 
 @ delay_ms subroutine
 @ Use the Cortex SysTick timer to wait for a specified number of milliseconds
@@ -148,7 +189,30 @@ delay_ms:
   LDR   R4, =SYSTICK_CSR            @ Stop SysTick timer
   LDR   R5, =0                      @   by writing 0 to CSR
   STR   R5, [R4]                    @   CSR is the Control and Status Register
-  
+
   POP   {R4-R5,PC}
 
-  .end
+@ External interrupt line 0 (EXTI0) interrupt handler
+.type  EXTI0_IRQHandler, %function
+EXTI0_IRQHandler:
+  PUSH  {LR}
+
+  LDR   R4, =SYSTICK_VAL
+  LDR   R5, [R4]
+  MOV   R11, R5
+
+  @ Clear the EXTI0 pending flag
+  LDR   R4, =EXTI_PR      @ Clear (acknowledge) the interrupt
+  MOV   R5, #(1<<0)       @ Only clear bit 0
+  STR   R5, [R4]          @
+
+  BL     ButtonPressed
+
+  POP  {PC}
+
+.section .data
+  
+count:
+  .space  4
+
+.end
