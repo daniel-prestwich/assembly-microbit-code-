@@ -17,7 +17,9 @@ Main:
 Setup:
 
   PUSH  {LR}
-
+  mov r4, #0
+  ldr r5, =buttonCount2
+  str r4, [r5]
   @ Enable SYSCFG clock (needed for EXTI configuration)
   LDR   R4, =RCC_AHBENR
   LDR   R5, [R4]
@@ -206,6 +208,10 @@ delay_ms:
 .type  EXTI0_IRQHandler, %function
 EXTI0_IRQHandler:
   PUSH  {R4-R5, LR}
+  ldr   r4, =buttonCount2  @load current count
+  ldr   r5, [r4] @load current count from memory
+  add r5, r5, #1
+  str  r5, [r4]  @store the count back in memory
 
   LDR   R4, =random
   LDR   R5, [R4]
@@ -264,6 +270,9 @@ game:
   .space  4
   
 buttonCount:
+  .space  4
+
+buttonCount2:
   .space  4
 
 .end
