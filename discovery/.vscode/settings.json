@@ -12,5 +12,6 @@
     // Linux settings
     "cortex-debug.armToolchainPath.linux": "/usr/bin",
     "cortex-debug.gdbPath.linux": "/usr/bin/gdb-multiarch",
-    "cortex-debug.openocdPath.linux": "/usr/bin/openocd"
+    "cortex-debug.openocdPath.linux": "/usr/bin/openocd",
+    "cortex-debug.variableUseNaturalFormat": false
 }

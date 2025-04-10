@@ -8,7 +8,7 @@
 
 .include "definitions.s"
 
-.equ    BLINK_PERIOD, 200
+.equ    BLINK_PERIOD, 500
 
 .section .text
 
@@ -81,7 +81,7 @@ Setup:
   MOV     R6, #(LD4_PIN)
   
   MOV     R0, #0
-  LDR     R4, =game
+  LDR     R4, =randomLight
   STR     R0, [R4]
 EndSetup:
 
@@ -89,28 +89,21 @@ Idle_Loop:
   B     Idle_Loop
 
 
-Lights:
-
-  PUSH  {R4-R5, LR}
-
-  MOV   R8, R0
-  LDR   R4, =game
-  STR   R8, [R4]
-
-  MOV   R6, #(LD4_PIN)
-  MOV   R7, #0
-
-  .LwhBlink:
+Looper:
+  PUSH    {LR}
+  cpsie I
+  MOV     R6, #(LD4_PIN)
+    .LwhBlink2:
   @ Invert LD3
   @ by inverting bit 13 of GPIOE_ODR (GPIO Port E Output Data Register)
   @ (by using EOR to invert bit 13, leaving other bits unchanged)
   CMP     R6, #15
-  BGT     .LResetPin
+  BGT     .LResetPin2
 
-  CMP R7, R8 @r7= count, R8= random number
-  BGT .LEndLights
+  CMP R7, #7 @r7= count, R8= random number
+  BGT .LEndLights2
 
-  .LResetReturn:
+  .LResetReturn2:
   LDR     R4, =GPIOE_ODR
   LDR     R5, [R4]                  @ Read ...
   MOV     R12, #1
@@ -140,13 +133,82 @@ Lights:
   @ ... and repeat
   ADD R6, R6, #1
   ADD R7, R7, #1
-  B       .LwhBlink
+  LDR   R4, =currentLight
+  STR   R6, [R4]
+  B       .LwhBlink2
   
-  .LResetPin:
+  .LResetPin2:
   MOV     R6, #(LD4_PIN)
-  B .LResetReturn
+  B .LResetReturn2
+
+  .LEndLights2:
+
+  POP   {PC}
+
+
+
+Lights:
+
+  PUSH  {R4-R5, LR}
+
+  MOV   R8, R0
+
+
+  MOV   R6, #(LD4_PIN)
+  ADD   R6, R6, R8
+  LDR   R4, =randomLight
+  STR   R6, [R4]
+  //MOV   R7, #0
+
+  .LwhBlink:
+  @ Invert LD3
+  @ by inverting bit 13 of GPIOE_ODR (GPIO Port E Output Data Register)
+  @ (by using EOR to invert bit 13, leaving other bits unchanged)
+  //CMP     R6, #15
+  //BGT     .LResetPin
+
+  //CMP R7, R8 @r7= count, R8= random number
+  //BGT .LEndLights
+
+  .LResetReturn:
+  LDR     R4, =GPIOE_ODR
+  LDR     R5, [R4]                  @ Read ...
+  MOV     R12, #1
+  LSL     R12, R12, R6     @ R12 = 1 << R6
+  EOR     R5, R12         @ Modify ...
+  STR     R5, [R4]                  @ Write
+
+  @ wait for 1s ...
+  LDR     R0, =BLINK_PERIOD
+  BL      delay_ms
+
+  LDR     R4, =GPIOE_ODR
+  LDR     R5, [R4]                  @ Read ...
+  MOV     R12, #1
+  LSL     R12, R12, R6     @ R12 = 1 << R6
+  EOR     R5, R12         @ Modify ...
+  STR     R5, [R4]  
+
+  LDR     R0, =BLINK_PERIOD
+  BL      delay_ms
+
+
+  @ wait for 1s ...
+  LDR     R0, =BLINK_PERIOD
+  BL      delay_ms
+
+@   @ ... and repeat
+@   /ADD R6, R6, #1
+@   ADD R7, R7, #1
+@   B       .LwhBlink
+  
+@   .LResetPin:
+@   MOV     R6, #(LD4_PIN)
+@   B .LResetReturn
 
   .LEndLights:
+
+  BL    Looper
 
   POP   {R4-R5, PC}
 
@@ -163,7 +225,7 @@ Lights:
 @   None
 delay_ms:
   PUSH  {R4-R5,LR}
-
+  cpsie I 
   LDR   R4, =SYSTICK_CSR            @ Stop SysTick timer
   LDR   R5, =0                      @   by writing 0 to CSR
   STR   R5, [R4]                    @   CSR is the Control and Status Register
@@ -207,6 +269,11 @@ delay_ms:
 EXTI0_IRQHandler:
   PUSH  {R4-R5, LR}
 
+  @ Clear the EXTI0 pending flag
+  LDR   R4, =EXTI_PR      @ Clear (acknowledge) the interrupt
+  MOV   R5, #(1<<0)       @ Only clear bit 0
+  STR   R5, [R4]          @
+
   LDR   R4, =random
   LDR   R5, [R4]
   CMP   R5, #0
@@ -218,15 +285,6 @@ EXTI0_IRQHandler:
   STR   R5, [R4]
 
 Skip:
-  @ Clear the EXTI0 pending flag
-  LDR   R4, =EXTI_PR      @ Clear (acknowledge) the interrupt
-  MOV   R5, #(1<<0)       @ Only clear bit 0
-  STR   R5, [R4]          @
-
-  LDR   R4, =game
-  LDR   R3, [R4]
-  CMP   R3, #0
-  BNE   .Lcounter
 
   LDR   R4, =random
   LDR   R5, [R4]
@@ -234,24 +292,43 @@ Skip:
   LSR   R5, R5, #3
   STR   R5, [R4]
   BL    Lights
-  B     .LendOfButtonCount
 
-.Lcounter:
-  LDR   R4, =buttonCount
-  LDR   R3, [R4]
-  ADD   R3, R3, #1
-  LDR   R4, =game
-  LDR   R5, [R4]
-  CMP   R3, R5
-  BLT   .LnotDone
-  MOV   R3, #0
-  STR   R3, [R4]
+@   LDR   R4, =buttonCount
+@   LDR   R3, [R4]
+@   ADD   R3, R3, #1
+@   STR   R3, [R4]
 
-.LnotDone:
-  LDR   R4, =buttonCount
-  STR   R3, [R4]
+@   LDR   R4, =currentLight
+@   LDR   R3, [R4]
+@   LDR   R4, =randomLight
+@   LDR   R5, [R4]
+@   CMP   R3, R5
+@   BNE   dontdoit
+@ Stop:
+@     B Stop
+@ dontdoit:
 
-.LendOfButtonCount:
+@   LDR   R4, =randomLight
+@   LDR   R3, [R4]
+@   CMP   R3, #0
+@   BNE   .Lcounter
+
+@   LDR   R4, =random
+@   LDR   R5, [R4]
+@   AND   R0, R5, 0b111
+@   LSR   R5, R5, #3
+@   STR   R5, [R4]
+@   BL    Lights
+@   B     .LendOfButtonCount
+
+@ .Lcounter:
+@   LDR   R4, =buttonCount
+@   LDR   R3, [R4]
+@   ADD   R3, R3, #1
+@   STR   R3, [R4]
+
+
+@ .LendOfButtonCount:
 
   POP  {R4-R5, PC}
 
@@ -260,10 +337,13 @@ Skip:
 random:
   .space  4
 
-game:
+randomLight:
   .space  4
   
 buttonCount:
+  .space  4
+
+currentLight:
   .space  4
 
 .end
